@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Clasificador de Toxicidad</title>
+</head>
+<body>
+  <h2>Clasificador de Toxicidad</h2>
+  <p>Escribe una o más frases (una por línea) y presiona <b>Clasificar</b>.</p>
+
+  <textarea id="textInput" rows="6" cols="60" placeholder="Ejemplo:
+You suck
+I love this place"></textarea><br><br>
+
+  <button id="classifyBtn" disabled>Clasificar</button>
+  <p id="status">Cargando modelo...</p>
+
+  <table border="1" cellpadding="4" cellspacing="0">
+    <thead>
+      <tr>
+        <th>Texto</th>
+        <th>identity_attack</th>
+        <th>insult</th>
+        <th>obscene</th>
+        <th>severe_toxicity</th>
+        <th>sexual_explicit</th>
+        <th>threat</th>
+        <th>toxicity</th>
+      </tr>
+    </thead>
+    <tbody id="results"></tbody>
+  </table>
+
+  <!-- Librerías -->
+  <script src="https://unpkg.com/@tensorflow/tfjs"></script>
+  <script src="https://unpkg.com/@tensorflow-models/toxicity"></script>
+
+  <script>
+    const LABELS = [
+      'identity_attack',
+      'insult',
+      'obscene',
+      'severe_toxicity',
+      'sexual_explicit',
+      'threat',
+      'toxicity'
+    ];
+
+    const threshold = 0.9;
+    let model;
+
+    const classifyBtn = document.getElementById("classifyBtn");
+    const status = document.getElementById("status");
+    const resultsBody = document.getElementById("results");
+
+    // 🔹 Cargar modelo automáticamente
+    (async () => {
+      try {
+        model = await toxicity.load(threshold);
+        status.textContent = "Modelo cargado correctamente (threshold = 0.9)";
+        classifyBtn.disabled = false;
+      } catch (err) {
+        status.textContent = "Error al cargar el modelo: " + err.message;
+        console.error(err);
+      }
+    })();
+
+    // 🔹 Clasificar texto
+    classifyBtn.onclick = async () => {
+      const lines = document.getElementById("textInput").value
+        .split("\n")
+        .map(t => t.trim())
+        .filter(t => t.length > 0);
+
+      if (!lines.length) {
+        alert("Escribe al menos una frase.");
+        return;
+      }
+
+      if (!model) {
+        alert("El modelo aún no está listo.");
+        return;
+      }
+
+      status.textContent = "Clasificando...";
+      resultsBody.innerHTML = "";
+
+      try {
+        const predictions = await model.classify(lines);
+
+        lines.forEach((text, i) => {
+          const row = document.createElement("tr");
+          const cellText = document.createElement("td");
+          cellText.textContent = text;
+          row.appendChild(cellText);
+
+          for (const label of LABELS) {
+            const pred = predictions.find(p => p.label === label);
+            const cell = document.createElement("td");
+            if (pred && pred.results[i]) {
+              const prob = pred.results[i].probabilities[1].toFixed(3);
+              const match = pred.results[i].match;
+              cell.textContent = `${prob} (${match})`;
+            } else {
+              cell.textContent = "-";
+            }
+            row.appendChild(cell);
+          }
+          resultsBody.appendChild(row);
+        });
+
+        status.textContent = "Clasificación completada.";
+      } catch (err) {
+        console.error(err);
+        status.textContent = "Error durante la clasificación: " + err.message;
+      }
+    };
+  </script>
+</body>
+</html>
